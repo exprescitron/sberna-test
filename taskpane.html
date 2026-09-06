@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sběrna TEST</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>
+  :root{
+    --bg:#FBFBFC; --card:#fff; --ink:#16181D; --muted:#6E7480;
+    --line:#DBDEE4; --ok:#2F6B4F; --ok-bg:#E0EDE6; --bad:#A33A34; --bad-bg:#F7E4E2;
+    --brand:#A8482B;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#12151A;--card:#191D24;--ink:#E9EBF0;--muted:#868C98;--line:#262A32;
+          --ok:#79C3A0;--ok-bg:#122620;--bad:#E28A84;--bad-bg:#2C1715;--brand:#E28C6C;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:12px;background:var(--bg);color:var(--ink);
+       font:13px/1.5 "Segoe UI",system-ui,sans-serif}
+  h1{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:7px}
+  h1 i{width:14px;height:14px;background:var(--brand);border-radius:3px;display:block}
+  .verdict{padding:10px 12px;border-radius:4px;margin-bottom:12px;font-weight:600;font-size:13px}
+  .verdict.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
+  .verdict.bad{background:var(--bad-bg);color:var(--bad);border:1px solid var(--bad)}
+  .verdict small{display:block;font-weight:400;margin-top:4px;opacity:.85}
+  h2{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+     margin:14px 0 6px;font-weight:600}
+  table{width:100%;border-collapse:collapse;background:var(--card);
+        border:1px solid var(--line);border-radius:4px;overflow:hidden}
+  td{padding:6px 9px;border-bottom:1px solid var(--line);vertical-align:top;
+     font-size:12px;word-break:break-all}
+  tr:last-child td{border-bottom:none}
+  td.k{color:var(--muted);width:38%;word-break:normal}
+  td.v{font-family:"Cascadia Mono",Consolas,monospace;font-size:11.5px}
+  .y{color:var(--ok);font-weight:600}
+  .n{color:var(--bad);font-weight:600}
+  button{width:100%;margin-top:14px;padding:9px;background:var(--brand);color:#fff;
+         border:none;border-radius:4px;font:600 13px "Segoe UI",sans-serif;cursor:pointer}
+  #note{margin-top:10px;font-size:11.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<h1><i></i>Sběrna TEST</h1>
+<div id="verdict" class="verdict">Načítám…</div>
+<div id="out"></div>
+<button id="copy" type="button">Zkopírovat výsledek</button>
+<p id="note">Doplněk jen čte. Nic neodesílá a nikam nic neukládá.</p>
+
+<script>
+(function () {
+  var rows = [];
+  function add(section, key, val) { rows.push([section, key, val]); }
+
+  function render(verdictOk, verdictText, verdictSub) {
+    var v = document.getElementById("verdict");
+    v.className = "verdict " + (verdictOk ? "ok" : "bad");
+    v.innerHTML = verdictText + (verdictSub ? "<small>" + verdictSub + "</small>" : "");
+
+    var html = "", last = null;
+    rows.forEach(function (r) {
+      if (r[0] !== last) { html += (last ? "</table>" : "") + "<h2>" + r[0] + "</h2><table>"; last = r[0]; }
+      html += "<tr><td class='k'>" + r[1] + "</td><td class='v'>" + r[2] + "</td></tr>";
+    });
+    if (last) html += "</table>";
+    document.getElementById("out").innerHTML = html;
+  }
+
+  function esc(s) {
+    if (s === undefined) return "<span class='n'>undefined</span>";
+    if (s === null) return "<span class='n'>null</span>";
+    return String(s).replace(/[<>&]/g, function (c) {
+      return { "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c];
+    });
+  }
+
+  function fail(msg) {
+    render(false, "NEFUNGUJE", msg);
+  }
+
+  // Pojistka: kdyby Office.js vubec nenabehl
+  var booted = false;
+  setTimeout(function () {
+    if (!booted) fail("Office.js se nenačetl do 8 sekund. Doplněk se v tomto klientovi nespustil.");
+  }, 8000);
+
+  Office.onReady(function (info) {
+    booted = true;
+    try {
+      add("Klient", "host", esc(info && info.host));
+      add("Klient", "platform", esc(info && info.platform));
+
+      var mbx = Office.context && Office.context.mailbox;
+      if (!mbx) { fail("Office.context.mailbox není k dispozici."); return; }
+
+      var d = mbx.diagnostics || {};
+      add("Klient", "hostName", esc(d.hostName));
+      add("Klient", "hostVersion", esc(d.hostVersion));
+      add("Klient", "OWAView", esc(d.OWAView));
+
+      var up = mbx.userProfile || {};
+      add("Uživatel", "emailAddress", esc(up.emailAddress));
+      add("Uživatel", "displayName", esc(up.displayName));
+      add("Uživatel", "timeZone", esc(up.timeZone));
+
+      ["1.3", "1.8", "1.10", "1.13"].forEach(function (s) {
+        var ok = false;
+        try { ok = Office.context.requirements.isSetSupported("Mailbox", s); } catch (e) {}
+        add("Requirement sets", "Mailbox " + s,
+            ok ? "<span class='y'>ano</span>" : "<span class='n'>NE</span>");
+      });
+
+      var item = mbx.item;
+
+      // ---- TOHLE JE TEN TEST ----
+      if (!item) {
+        add("Zpráva", "Office.context.mailbox.item", "<span class='n'>null</span>");
+        render(false, "ZPRÁVA SE NEČTE",
+          "item je null. Nejčastější příčina: schránka je skrytá z globálního adresáře (GAL). " +
+          "Doplněk se načetl, ale k obsahu zprávy se nedostane.");
+        return;
+      }
+
+      var from = item.from || item.sender || {};
+      add("Zpráva", "subject", esc(item.subject));
+      add("Zpráva", "from.displayName", esc(from.displayName));
+      add("Zpráva", "from.emailAddress", esc(from.emailAddress));
+      add("Zpráva", "internetMessageId", esc(item.internetMessageId));
+      add("Zpráva", "conversationId", esc(item.conversationId));
+      add("Zpráva", "dateTimeCreated", esc(item.dateTimeCreated));
+      add("Zpráva", "itemId (prvních 40)",
+          item.itemId ? esc(String(item.itemId).slice(0, 40) + "…") : esc(item.itemId));
+
+      var haveConv = !!item.conversationId;
+      var haveFrom = !!from.emailAddress;
+
+      // ---- sdilena schranka ----
+      var canShared = false;
+      try { canShared = Office.context.requirements.isSetSupported("Mailbox", "1.8"); } catch (e) {}
+
+      if (!canShared || typeof item.getSharedPropertiesAsync !== "function") {
+        add("Sdílená schránka", "getSharedPropertiesAsync", "<span class='n'>není k dispozici</span>");
+        finish(haveConv, haveFrom, null);
+        return;
+      }
+
+      item.getSharedPropertiesAsync(function (res) {
+        if (res.status === Office.AsyncResultStatus.Succeeded && res.value) {
+          add("Sdílená schránka", "owner", esc(res.value.owner));
+          add("Sdílená schránka", "targetMailbox", esc(res.value.targetMailbox));
+          add("Sdílená schránka", "delegatePermissions", esc(res.value.delegatePermissions));
+          finish(haveConv, haveFrom, res.value.targetMailbox || res.value.owner);
+        } else {
+          add("Sdílená schránka", "getSharedPropertiesAsync",
+              "<span class='n'>chyba: " + esc(res.error && res.error.message) + "</span>");
+          add("Sdílená schránka", "poznámka",
+              "Tohle je v pořádku, pokud je otevřená VLASTNÍ schránka, ne sdílená.");
+          finish(haveConv, haveFrom, null);
+        }
+      });
+
+    } catch (e) {
+      fail("Výjimka: " + esc(e && e.message));
+    }
+  });
+
+  function finish(haveConv, haveFrom, shared) {
+    if (haveConv && haveFrom) {
+      render(true, "FUNGUJE",
+        "Zpráva se čte včetně conversationId — to je pole, na kterém stojí párování vláken."
+        + (shared ? " Čteno ze sdílené schránky " + esc(shared) + "." : ""));
+    } else {
+      render(false, "ČTE JEN ČÁSTEČNĚ",
+        (haveFrom ? "" : "Chybí adresa odesílatele. ") +
+        (haveConv ? "" : "Chybí conversationId — bez něj nefunguje párování vláken."));
+    }
+  }
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var txt = rows.map(function (r) {
+      return r[0] + " | " + r[1] + " = " + String(r[2]).replace(/<[^>]+>/g, "");
+    }).join("\n");
+    txt = "SBERNA TEST " + new Date().toISOString() + "\n" + txt;
+    var ta = document.createElement("textarea");
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); this.textContent = "Zkopírováno"; }
+    catch (e) { this.textContent = "Nešlo zkopírovat"; }
+    document.body.removeChild(ta);
+  });
+})();
+</script>
+</body>
+</html>

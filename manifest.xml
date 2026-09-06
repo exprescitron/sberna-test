@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
+  <Id>e6f30ba6-4155-43f3-ab02-7c1e959b60f7</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>JAVEX-TRADE, s.r.o.</ProviderName>
+  <DefaultLocale>cs-CZ</DefaultLocale>
+  <DisplayName DefaultValue="Sberna TEST"/>
+  <Description DefaultValue="Testovaci doplnek - overuje, co lze precist ze zpravy ve sdilene schrance."/>
+  <IconUrl DefaultValue="https://exprescitron.github.io/sberna-test/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://exprescitron.github.io/sberna-test/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://exprescitron.github.io/sberna-test/"/>
+
+  <AppDomains>
+    <AppDomain>https://exprescitron.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.3"/>
+    </Sets>
+  </Requirements>
+
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://exprescitron.github.io/sberna-test/taskpane.html"/>
+        <RequestedHeight>350</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+
+  <Permissions>ReadItem</Permissions>
+
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.3">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <FunctionFile resid="fnFile"/>
+
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="grpSberna">
+                  <Label resid="grpLabel"/>
+                  <Control xsi:type="Button" id="btnSberna">
+                    <Label resid="btnLabel"/>
+                    <Supertip>
+                      <Title resid="btnLabel"/>
+                      <Description resid="btnTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="icon16"/>
+                      <bt:Image size="32" resid="icon32"/>
+                      <bt:Image size="80" resid="icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="taskpaneUrl"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+
+            <!-- KLICOVY RADEK: bez nej se doplnek ve sdilene schrance vubec neobjevi -->
+            <SupportsSharedFolders>true</SupportsSharedFolders>
+
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+
+      <Resources>
+        <bt:Images>
+          <bt:Image id="icon16" DefaultValue="https://exprescitron.github.io/sberna-test/assets/icon-16.png"/>
+          <bt:Image id="icon32" DefaultValue="https://exprescitron.github.io/sberna-test/assets/icon-32.png"/>
+          <bt:Image id="icon80" DefaultValue="https://exprescitron.github.io/sberna-test/assets/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="fnFile" DefaultValue="https://exprescitron.github.io/sberna-test/commands.html"/>
+          <bt:Url id="taskpaneUrl" DefaultValue="https://exprescitron.github.io/sberna-test/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="grpLabel" DefaultValue="Sberna"/>
+          <bt:String id="btnLabel" DefaultValue="Sberna TEST"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="btnTip" DefaultValue="Zobrazi, co lze z teto zpravy precist. Nic nikam neodesila."/>
+        </bt:LongStrings>
+      </Resources>
+
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>
