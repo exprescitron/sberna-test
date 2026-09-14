@@ -7,7 +7,7 @@
   xsi:type="MailApp">
 
   <Id>e6f30ba6-4155-43f3-ab02-7c1e959b60f7</Id>
-  <Version>1.0.0.0</Version>
+  <Version>1.0.0.1</Version>
   <ProviderName>JAVEX-TRADE, s.r.o.</ProviderName>
   <DefaultLocale>cs-CZ</DefaultLocale>
   <DisplayName DefaultValue="Sberna TEST"/>
@@ -59,6 +59,13 @@
       <Hosts>
         <Host xsi:type="MailHost">
           <DesktopFormFactor>
+
+            <!-- KLICOVY RADEK: musi byt PRVNI v DesktopFormFactor, pred FunctionFile
+                 i pred ExtensionPoint - schema na poradi trva. Bez nej se doplnek
+                 ve sdilene schrance vubec neobjevi.
+                 Sdilene SLOZKY chteji Mailbox 1.8, sdilene SCHRANKY 1.13. -->
+            <SupportsSharedFolders>true</SupportsSharedFolders>
+
             <FunctionFile resid="fnFile"/>
 
             <ExtensionPoint xsi:type="MessageReadCommandSurface">
@@ -83,9 +90,6 @@
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
-
-            <!-- KLICOVY RADEK: bez nej se doplnek ve sdilene schrance vubec neobjevi -->
-            <SupportsSharedFolders>true</SupportsSharedFolders>
 
           </DesktopFormFactor>
         </Host>
