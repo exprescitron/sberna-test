@@ -96,6 +96,8 @@
 <script>
 // ---------------------------------------------------------------- nastaveni
 // Nazev kategorie musi presne sedet na podminku ve flow Power Automate.
+// Ve flow je zapsany procentovym kodovanim jako 'Zpracov%C3%A1no', protoze
+// konektor Office 365 Outlook neunese diakritiku v adrese.
 var KATEGORIE = "Zpracováno";
 // Barva kategorie. Presety 0-24, mapovani na konkretni barvy neni v dokumentaci
 // jednoznacne - barvu lze kdykoli prenastavit primo v Outlooku (pravy klik na
@@ -150,7 +152,11 @@ function podporovano(sada) {
 Office.onReady(function () {
   var item = Office.context.mailbox.item;
 
-  stav["hostName"] = Office.context.diagnostics ? Office.context.diagnostics.hostName : "?";
+  // V Outlooku je diagnostics pod mailbox, ne pod context - proto drive
+  // hostName = undefined.
+  var dg = Office.context.mailbox.diagnostics || Office.context.diagnostics || {};
+  stav["hostName"] = dg.hostName || "?";
+  stav["hostVersion"] = dg.hostVersion || "?";
   stav["Mailbox 1.8 (kategorie)"] = podporovano("1.8") ? "ano" : "NE";
   stav["Mailbox 1.13"] = podporovano("1.13") ? "ano" : "NE";
 
@@ -217,64 +223,101 @@ function zjistiKontext() {
 }
 
 // ---------------------------------------------------------------- oznaceni
+// Poradi je zamerne obracene, nez by clovek cekal: zkousi se rovnou pridat
+// kategorii na zpravu, a teprve kdyz to selze, resi se hlavni seznam schranky.
+// Duvod: masterCategories.getAsync se ve sdilene schrance nemusi vubec ozvat
+// (overeno 15. 9. 2026 - panel zustal viset bez chyby i bez vysledku).
+var hlidac = null;
+
+function dokonceno() {
+  if (hlidac) { clearTimeout(hlidac); hlidac = null; }
+}
+
 $("oznacit").addEventListener("click", function () {
   $("oznacit").disabled = true;
   $("vysledek").innerHTML = "";
-  zajistiKategoriiVSeznamu(pridejKategoriiNaZpravu);
+
+  // Kdyby se Outlook zase neozval, at to panel aspon rekne.
+  hlidac = setTimeout(function () {
+    hlidac = null;
+    $("oznacit").disabled = false;
+    zapis("chyba", "Outlook se do 15 sekund neozval.");
+    zapis("info", "Zkus to znovu, nebo označ ručně přes Kategorizovat v pásu karet.");
+    stav["vysledek"] = "TIMEOUT";
+    diag();
+  }, 15000);
+
+  bezpecne(function () { pridejKategorii(true); });
 });
 
-// Kategorie musi nejdriv existovat v hlavnim seznamu schranky, jinak ji
-// nektere klienty na zpravu nepridaji. U sdilene schranky se tohle chova
-// nespolehlive, proto se pripadna chyba jen zaznamena a pokracuje se dal.
-function zajistiKategoriiVSeznamu(hotovo) {
-  if (!Office.context.mailbox.masterCategories) {
-    stav["masterCategories"] = "nedostupne";
-    zapis("info", "Hlavní seznam kategorií není dostupný, zkouším přidat rovnou.");
-    return hotovo();
+function bezpecne(fn) {
+  try { fn(); }
+  catch (e) {
+    dokonceno();
+    $("oznacit").disabled = false;
+    zapis("chyba", "Výjimka: " + e.message);
+    stav["vyjimka"] = e.message;
+    diag();
   }
-
-  Office.context.mailbox.masterCategories.getAsync(function (v) {
-    if (v.status !== Office.AsyncResultStatus.Succeeded) {
-      stav["masterCategories.getAsync"] = v.error ? v.error.message : "selhalo";
-      zapis("info", "Seznam kategorií se nepodařilo načíst, zkouším přidat rovnou.");
-      return hotovo();
-    }
-
-    var existuje = (v.value || []).some(function (k) { return k.displayName === KATEGORIE; });
-    stav["kategorie v seznamu"] = existuje ? "ano" : "ne, zakladam";
-    if (existuje) return hotovo();
-
-    Office.context.mailbox.masterCategories.addAsync(
-      [{ displayName: KATEGORIE, color: Office.MailboxEnums.CategoryColor[BARVA] }],
-      function (v2) {
-        if (v2.status === Office.AsyncResultStatus.Succeeded) {
-          zapis("ok", "Kategorie „" + KATEGORIE + "“ založena v seznamu schránky.");
-        } else {
-          stav["masterCategories.addAsync"] = v2.error ? v2.error.message : "selhalo";
-          zapis("info", "Kategorii se nepodařilo založit, zkouším přidat rovnou.");
-        }
-        hotovo();
-      }
-    );
-  });
 }
 
-function pridejKategoriiNaZpravu() {
+function pridejKategorii(prvniPokus) {
   Office.context.mailbox.item.categories.addAsync([KATEGORIE], function (v) {
     if (v.status === Office.AsyncResultStatus.Succeeded) {
+      dokonceno();
       zapis("ok", "Označeno „" + KATEGORIE + "“ v " + new Date().toLocaleTimeString("cs-CZ") + ".");
       zapis("info", "Přesun do složky provede Power Automate, obvykle do pěti minut.");
       zapis("info", "Identifikátor: " + identifikator);
       stav["vysledek"] = "OK";
-    } else {
-      $("oznacit").disabled = false;
-      var m = v.error ? v.error.message : "neznámá chyba";
-      zapis("chyba", "Označení selhalo: " + m);
-      zapis("info", "Otevři Diagnostiku, zkopíruj obsah a pošli ho.");
-      stav["vysledek"] = "CHYBA: " + m;
+      diag();
+      return;
     }
-    diag();
+
+    var m = v.error ? v.error.message : "neznámá chyba";
+    stav["categories.addAsync"] = m;
+
+    if (prvniPokus) {
+      // Nejcastejsi duvod selhani: kategorie neni v hlavnim seznamu schranky.
+      zapis("info", "Kategorie ve schránce nejspíš není, zkouším ji založit.");
+      bezpecne(zalozKategoriiAZkusZnovu);
+    } else {
+      dokonceno();
+      $("oznacit").disabled = false;
+      zapis("chyba", "Označení selhalo: " + m);
+      zapis("info", "Založ kategorii „" + KATEGORIE + "“ ručně přes Kategorizovat a zkus to znovu.");
+      stav["vysledek"] = "CHYBA: " + m;
+      diag();
+    }
   });
+}
+
+function zalozKategoriiAZkusZnovu() {
+  var mc = Office.context.mailbox.masterCategories;
+  if (!mc || typeof mc.addAsync !== "function") {
+    dokonceno();
+    $("oznacit").disabled = false;
+    zapis("chyba", "Hlavní seznam kategorií není v tomto klientovi dostupný.");
+    stav["masterCategories"] = "nedostupne";
+    diag();
+    return;
+  }
+
+  mc.addAsync(
+    [{ displayName: KATEGORIE, color: Office.MailboxEnums.CategoryColor[BARVA] }],
+    function (v) {
+      if (v.status === Office.AsyncResultStatus.Succeeded) {
+        zapis("ok", "Kategorie „" + KATEGORIE + "“ založena, zkouším znovu.");
+        bezpecne(function () { pridejKategorii(false); });
+      } else {
+        dokonceno();
+        $("oznacit").disabled = false;
+        var m = v.error ? v.error.message : "selhalo";
+        zapis("chyba", "Kategorii se nepodařilo založit: " + m);
+        stav["masterCategories.addAsync"] = m;
+        diag();
+      }
+    }
+  );
 }
 
 // ---------------------------------------------------------------- kopie
