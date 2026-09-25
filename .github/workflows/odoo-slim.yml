@@ -1,0 +1,34 @@
+name: Build slim Odoo 19 tree
+on:
+  push:
+    branches: [ci-tools]
+    paths: [".github/workflows/odoo-slim.yml", "ci/slim.py"]
+permissions:
+  contents: write
+jobs:
+  slim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: ci-tools, path: tools}
+      - uses: actions/checkout@v4
+        with: {repository: odoo/odoo, ref: "19.0", path: odoo-src, fetch-depth: 1}
+      - name: Build slim tree
+        run: |
+          python3 tools/ci/slim.py odoo-src slim
+          cd odoo-src && git rev-parse HEAD > ../slim/ODOO_COMMIT && cd ..
+          tar czf odoo19-slim.tar.gz -C slim .
+          ls -la odoo19-slim.tar.gz
+          mkdir out && split -b 45m -d odoo19-slim.tar.gz out/odoo19-slim.tar.gz.part
+          sha256sum odoo19-slim.tar.gz > out/SHA256
+          ls -la out
+      - name: Publish to branch odoo19-slim
+        run: |
+          cd tools
+          git config user.name ci && git config user.email ci@users.noreply.github.com
+          git checkout --orphan odoo19-slim
+          git rm -rf --quiet . || true
+          cp -r ../out/* .
+          echo "Slim Odoo 19 CE tree for local tests. cat odoo19-slim.tar.gz.part* > odoo19-slim.tar.gz" > README.md
+          git add -A && git commit -qm "slim odoo 19 tree $(date -u +%F)"
+          git push -f origin odoo19-slim
