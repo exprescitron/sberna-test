@@ -1,7 +1,7 @@
 """Build a slim Odoo 19 CE tree: core + dependency closure of ROOTS, without static/i18n/tests."""
 import ast, os, shutil, sys, tarfile
 SRC, DST = sys.argv[1], sys.argv[2]
-ROOTS = ["base", "web", "mail", "crm", "project", "contacts", "base_setup", "web_tour", "html_editor"]
+ROOTS = ["base", "web", "mail", "crm", "project", "contacts", "base_setup", "web_tour", "html_editor", "iap", "rpc", "test_mail", "mail_bot", "sms", "microsoft_outlook", "google_gmail"]
 ADDONS = os.path.join(SRC, "addons")
 def manifest(name):
     for root in (ADDONS, os.path.join(SRC, "odoo", "addons")):
